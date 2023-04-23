@@ -7,8 +7,8 @@ import io
 import os
 import os.path as osp
 from configparser import ConfigParser
-from pibooth.utils import LOGGER, open_text_editor
 
+from pibooth.utils import LOGGER, open_text_editor
 
 PARSER = ConfigParser()
 
@@ -80,8 +80,8 @@ DEFAULT = {
         'oops': "Maldición! Algo salió mal",
     },
     'fr': {
-        'intro': "Faire une photo",
-        'intro_print': "Ou sinon\ntu peux toujours\nimprimer\ncette photo",
+        'intro': "Faire\nune\nphoto",
+        'intro_print': "On imprime ?",
         'choose': "Choisis ton format",
         '1': "1 photo",
         '2': "2 photos",

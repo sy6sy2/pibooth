@@ -1,18 +1,18 @@
 # -*- coding: utf-8 -*-
-
 """Pibooth view management.
 """
 
+import contextlib
 import os
 import time
-import contextlib
+
 import pygame
-from pygame import gfxdraw
-from PIL import Image
-from pibooth import pictures, fonts
-from pibooth.view import background
-from pibooth.utils import LOGGER
+from pibooth import fonts, pictures
 from pibooth.pictures import sizing
+from pibooth.utils import LOGGER
+from pibooth.view import background
+from PIL import Image
+from pygame import gfxdraw
 
 
 class PiWindow(object):
@@ -30,7 +30,10 @@ class PiWindow(object):
 
     CENTER = 'center'
     RIGHT = 'right'
+    RIGHT_TOP_THIRD = 'right-top-third'
+    LEFT_TOP_THIRD = 'left-top-third'
     LEFT = 'left'
+    LEFT_TWO_THIRDS = 'left-two-thirds'
     FULLSCREEN = 'fullscreen'
 
     def __init__(self, title,
@@ -69,7 +72,10 @@ class PiWindow(object):
 
         self._pos_map = {self.CENTER: self._center_pos,
                          self.RIGHT: self._right_pos,
+                         self.RIGHT_TOP_THIRD: self._right_top_third_pos,
+                         self.LEFT_TOP_THIRD: self._left_top_third_pos,
                          self.LEFT: self._left_pos,
+                         self.LEFT_TWO_THIRDS: self._left_two_thirds_pos,
                          self.FULLSCREEN: self._center_pos}
 
         # Don't use pygame.mouse.get_cursor() because will be removed in pygame2
@@ -79,16 +85,41 @@ class PiWindow(object):
                         (192, 0, 224, 0, 240, 0, 248, 0, 252, 0, 254, 0, 255, 0, 255,
                          128, 255, 192, 255, 224, 254, 0, 239, 0, 207, 0, 135, 128, 7, 128, 3, 0))
 
-    def _update_foreground(self, pil_image, pos=CENTER, resize=True):
+    def _update_foreground(self, pil_image, pos=CENTER, resize=True, pil_image_bis=None, pos_bis=CENTER, resize_bis=True):
         """Show a PIL image on the foreground.
         Only one is bufferized to avoid memory leak.
         """
+        LOGGER.debug("_update_foreground")
         image_name = id(pil_image)
+
+        image_name_bis = None
+        if pil_image_bis is not None:
+            image_name_bis = id(pil_image_bis)
+
+        third_max_1 = 0.35
+        third_max_2 = 0.80
 
         if pos == self.FULLSCREEN:
             image_size_max = (self.surface.get_size()[0] * 0.9, self.surface.get_size()[1] * 0.9)
+        elif pos == self.RIGHT_TOP_THIRD:
+            image_size_max = (self.surface.get_size()[0] * third_max_1, self.surface.get_size()[1] * third_max_2)
+        elif pos == self.LEFT_TOP_THIRD:
+            image_size_max = (self.surface.get_size()[0] * third_max_1, self.surface.get_size()[1] * third_max_2)
+        elif pos == self.LEFT_TWO_THIRDS:
+            image_size_max = (self.surface.get_size()[0] * 0.70, self.surface.get_size()[1] * 0.95)
         else:
             image_size_max = (self.surface.get_size()[0] * 0.48, self.surface.get_size()[1])
+
+        if pos_bis == self.FULLSCREEN:
+            image_size_max_bis = (self.surface.get_size()[0] * 0.9, self.surface.get_size()[1] * 0.9)
+        elif pos_bis == self.RIGHT_TOP_THIRD:
+            image_size_max_bis = (self.surface.get_size()[0] * third_max_1, self.surface.get_size()[1] * third_max_2)
+        elif pos_bis == self.LEFT_TOP_THIRD:
+            image_size_max_bis = (self.surface.get_size()[0] * third_max_1, self.surface.get_size()[1] * third_max_2)
+        elif pos_bis == self.LEFT_TWO_THIRDS:
+            image_size_max_bis = (self.surface.get_size()[0] * 0.48, self.surface.get_size()[1])
+        else:
+            image_size_max_bis = (self.surface.get_size()[0] * 0.48, self.surface.get_size()[1])
 
         buff_size, buff_image = self._buffered_images.get(image_name, (None, None))
         if buff_image and image_size_max == buff_size:
@@ -105,7 +136,24 @@ class PiWindow(object):
             LOGGER.debug("Add to buffer the image '%s'", image_name)
             self._buffered_images[image_name] = (image_size_max, image)
 
-        self._current_foreground = (pil_image, pos, resize)
+        image_bis = None
+        if image_name_bis is not None:
+            buff_size_bis, buff_image_bis = self._buffered_images.get(image_name_bis, (None, None))
+            if buff_image_bis and image_size_max_bis == buff_size_bis:
+                image_bis = buff_image_bis
+            else:
+                if resize_bis:
+                    image_bis = pil_image_bis.resize(sizing.new_size_keep_aspect_ratio(
+                        pil_image_bis.size, image_size_max_bis), Image.ANTIALIAS)
+                else:
+                    image_bis = pil_image_bis
+                image_bis = pygame.image.frombuffer(image_bis.tobytes(), image_bis.size, image_bis.mode)
+                if self._current_foreground:
+                    self._buffered_images.pop(id(self._current_foreground[4]), None)
+                LOGGER.debug("Add to buffer the image bis '%s'", image_name_bis)
+                self._buffered_images[image_name_bis] = (image_size_max_bis, image_bis)
+
+        self._current_foreground = (pil_image, pos, resize, pil_image_bis, pos_bis, resize_bis)
 
         if self.debug and resize:
             # Build rectangle around picture area for debuging purpose
@@ -113,6 +161,14 @@ class PiWindow(object):
             pygame.draw.rect(outlines, pygame.Color(255, 0, 0), outlines.get_rect(), 2)
             self.surface.blit(outlines, self._pos_map[pos](outlines))
 
+        if self.debug and resize_bis and image_bis is not None:
+            # Build rectangle around picture area for debuging purpose
+            outlines = pygame.Surface(image_size_max_bis, pygame.SRCALPHA, 32)
+            pygame.draw.rect(outlines, pygame.Color(255, 0, 0), outlines.get_rect(), 2)
+            self.surface.blit(outlines, self._pos_map[pos_bis](outlines))
+
+        if image_bis is not None:
+            self.surface.blit(image_bis, self._pos_map[pos_bis](image_bis))
         return self.surface.blit(image, self._pos_map[pos](image))
 
     def _update_background(self, bkgd):
@@ -190,11 +246,61 @@ class PiWindow(object):
         pos = (self.surface.get_rect().centerx // 2, self.surface.get_rect().centery)
         return image.get_rect(center=pos) if image else pos
 
+    def _left_two_thirds_pos(self, image):
+        """
+        Return the position of the given image to be put on the left of the screen
+        """
+        pos = (
+            self.surface.get_rect().centerx // 2 + 150,
+            self.surface.get_rect().centery)
+        return image.get_rect(center=pos) if image else pos
+
     def _right_pos(self, image):
         """
         Return the position of the given image to be put on the right of the screen
         """
         pos = (self.surface.get_rect().centerx + self.surface.get_rect().centerx // 2, self.surface.get_rect().centery)
+        return image.get_rect(center=pos) if image else pos
+
+    def _right_top_third_pos(self, image):
+        """
+        Return the position of the given image to be put on the right top third of the screen
+        """
+        # On veut le milieu
+        w = self.surface.get_rect().width
+        h = self.surface.get_rect().height
+
+        k1 = (w * 9) // 48
+        k2 = w - k1
+
+        y = h // 2 - 60
+
+        # third_width = self.surface.get_rect().width / 3
+
+        pos = (
+            #  third_width * 2 + third_width / 2,
+            k2,
+            # self.surface.get_rect().centery - self.surface.get_rect().centery // 3
+            y
+        )
+        return image.get_rect(center=pos) if image else pos
+
+    def _left_top_third_pos(self, image):
+        """
+        Return the position of the given image to be put on the left top third of the screen
+        """
+        w = self.surface.get_rect().width
+        h = self.surface.get_rect().height
+        k1 = (w * 9) // 48
+
+        y = h // 2 - 60
+
+        pos = (
+            #  (self.surface.get_rect().width // 6),
+            k1,
+            # self.surface.get_rect().centery - self.surface.get_rect().centery // 3
+            y
+        )
         return image.get_rect(center=pos) if image else pos
 
     def get_rect(self, absolute=False):
@@ -239,17 +345,32 @@ class PiWindow(object):
         self._capture_number = (0, self._capture_number[1])
         self._update_background(background.OopsBackground())
 
-    def show_intro(self, pil_image=None, with_print=True):
+    def show_intro(self, pil_previous_image=None, pil_previous_previous_image=None, with_print=True):
         """Show introduction view.
         """
         self._capture_number = (0, self._capture_number[1])
-        if with_print and pil_image:
-            self._update_background(background.IntroWithPrintBackground(self.arrow_location, self.arrow_offset))
-        else:
-            self._update_background(background.IntroBackground(self.arrow_location, self.arrow_offset))
 
-        if pil_image:
-            self._update_foreground(pil_image, self.RIGHT)
+        # Deux photos et impirmante
+        if with_print and pil_previous_image and pil_previous_previous_image:
+            self._update_background(background.IntroWithPrintBackgroundBis(background.ARROW_BOTTOM_THIRD, self.arrow_offset))
+
+        # Une photo et imprimante
+        elif with_print and pil_previous_image:
+            self._update_background(background.IntroWithPrintBackground(background.ARROW_BOTTOM_THIRD, self.arrow_offset))
+
+        # Sinon
+        else:
+            self._update_background(background.IntroBackground(background.ARROW_BOTTOM_THIRD, self.arrow_offset))
+
+        # Deux photos
+        if pil_previous_image and pil_previous_previous_image:
+            self._update_foreground(pil_previous_image, self.RIGHT_TOP_THIRD, True, pil_previous_previous_image, self.LEFT_TOP_THIRD, True)
+
+        # Une photo
+        elif pil_previous_image:
+            self._update_foreground(pil_previous_image, self.RIGHT_TOP_THIRD)
+
+        # Pas de photo
         elif self._current_foreground:
             self._buffered_images.pop(id(self._current_foreground[0]), None)
             self._current_foreground = None
@@ -270,7 +391,7 @@ class PiWindow(object):
             # Clear the currently displayed image
             if self._current_foreground:
                 _, image = self._buffered_images.pop(id(self._current_foreground[0]))
-                _, pos, _ = self._current_foreground
+                _, pos, _, _, pos_bis, _ = self._current_foreground
                 self._current_foreground = None
                 image.fill((0, 0, 0))
                 return self.surface.blit(image, self._pos_map[pos](image))
@@ -290,7 +411,7 @@ class PiWindow(object):
         self._update_background(background.PrintBackground(self.arrow_location,
                                                            self.arrow_offset))
         if pil_image:
-            self._update_foreground(pil_image, self.LEFT)
+            self._update_foreground(pil_image, self.LEFT_TWO_THIRDS)
 
     def show_finished(self, pil_image=None):
         """Show finished view (image resized fullscreen).

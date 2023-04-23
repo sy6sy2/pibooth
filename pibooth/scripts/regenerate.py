@@ -4,16 +4,15 @@
 """
 
 import os
-from os import path as osp
 from datetime import datetime
+from os import path as osp
 
-from PIL import Image
-
-from pibooth.utils import LOGGER, configure_logging
-from pibooth.plugins import create_plugin_manager
 from pibooth.config import PiConfigParser
-from pibooth.pictures import get_picture_factory
 from pibooth.counters import Counters
+from pibooth.pictures import get_picture_factory
+from pibooth.plugins import create_plugin_manager
+from pibooth.utils import LOGGER, configure_logging
+from PIL import Image
 
 
 def get_captures(images_folder):
@@ -44,7 +43,6 @@ def regenerate_all_images(plugin_manager, config, basepath):
             continue
         captures = get_captures(captures_folder_path)
         LOGGER.info("Generating image from raws in folder %s", captures_folder_path)
-
         if len(captures) == capture_choices[0]:
             idx = 0
         elif len(captures) == capture_choices[1]:
@@ -82,8 +80,8 @@ def main():
     # Initialize varibales normally done by the app
     picture_plugin = plugin_manager.get_plugin('pibooth-core:picture')
     picture_plugin.texts_vars['date'] = datetime.now()
-    picture_plugin.texts_vars['count'] = Counters(config.join_path("counters.pickle"), taken=0, printed=0, forgotten=0,
-                                                  remaining_duplicates=config.getint('PRINTER', 'max_duplicates'))
+    picture_plugin.texts_vars['count'] = Counters(config.join_path("counters.pickle"), taken=0, printed=0)
+                                                  #remaining_duplicates=config.getint('PRINTER', 'max_duplicates'))
 
     for path in config.gettuple('GENERAL', 'directory', 'path'):
         regenerate_all_images(plugin_manager, config, path)

@@ -3,16 +3,17 @@
 """Pibooth configuration.
 """
 
-import io
 import ast
+import inspect
+import io
+import itertools
 import os
 import os.path as osp
-import itertools
-import inspect
-from configparser import RawConfigParser
 from collections import OrderedDict as odict
-from pibooth.utils import LOGGER, open_text_editor
+from configparser import RawConfigParser
+
 from pibooth import language
+from pibooth.utils import LOGGER, open_text_editor
 
 
 def values_list_repr(values):
@@ -220,10 +221,10 @@ DEFAULT = odict((
                 (-1,
                  "Maximum number of printed pages before warning on paper/ink levels (-1 = infinite)",
                  'Maximum of printed pages', [str(i) for i in range(-1, 1000)])),
-            ("max_duplicates",
-                (3,
-                 "Maximum number of duplicate pages sent to the printer (avoid paper waste)",
-                 'Maximum of printed duplicates', [str(i) for i in range(0, 10)])),
+            # ("max_duplicates",
+            #     (3,
+            #      "Maximum number of duplicate pages sent to the printer (avoid paper waste)",
+            #      'Maximum of printed duplicates', [str(i) for i in range(0, 10)])),
             ("pictures_per_page",
                 (1,
                  "Print 1, 2, 3 or 4 picture copies per page",
@@ -240,17 +241,21 @@ DEFAULT = odict((
                 (0.5,
                  "How long to press multiple hardware buttons in seconds",
                  None, None)),
-            ("picture_btn_pin",
+            ("right_btn_pin",
                 (11,
-                 "Physical GPIO IN pin to take a picture",
+                 "Physical GPIO IN pin to press right",
+                 None, None)),
+            ("left_btn_pin",
+                (13,
+                 "Physical GPIO IN pin to press left",
+                 None, None)),
+            ("center_btn_pin",
+                (16,
+                 "Physical GPIO IN pin to press center",
                  None, None)),
             ("picture_led_pin",
                 (7,
                  "Physical GPIO OUT pin to light a LED when picture button is pressed",
-                 None, None)),
-            ("print_btn_pin",
-                (13,
-                 "Physical GPIO IN pin to print a picture",
                  None, None)),
             ("print_led_pin",
                 (15,
@@ -259,7 +264,6 @@ DEFAULT = odict((
         ))
      ),
 ))
-
 
 class PiConfigParser(RawConfigParser):
 

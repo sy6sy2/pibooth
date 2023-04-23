@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import time
 import subprocess
+import time
 from io import BytesIO
+
+from pibooth.camera.base import BaseCamera
+from pibooth.language import get_translated_text
 from PIL import Image
+
 try:
     import picamera
 except ImportError:
     picamera = None  # picamera is optional
-from pibooth.language import get_translated_text
-from pibooth.camera.base import BaseCamera
 
 
 def get_rpi_camera_proxy(port=None):

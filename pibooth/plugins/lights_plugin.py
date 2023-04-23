@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import time
+
 import pibooth
 
 
@@ -25,7 +26,7 @@ class LightsPlugin(object):
 
     @pibooth.hookimpl
     def state_wait_do(self, app, events):
-        if app.find_print_event(events) and app.previous_picture_file and app.printer.is_ready():
+        if app.find_right_event(events) and app.previous_picture_file and app.printer.is_ready():
             if app.count.remaining_duplicates <= 0:
                 app.leds.printer.off()
             else:
@@ -63,7 +64,7 @@ class LightsPlugin(object):
 
     @pibooth.hookimpl
     def state_print_do(self, app, events):
-        if app.find_print_event(events):
+        if app.find_right_event(events):
             app.leds.printer.on()
             app.leds.capture.off()
 

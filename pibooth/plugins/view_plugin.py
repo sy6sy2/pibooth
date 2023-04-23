@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import pibooth
-from pibooth.utils import LOGGER, get_crash_message, PoolingTimer
+from pibooth.utils import LOGGER, PoolingTimer, get_crash_message
 
 
 class ViewPlugin(object):
@@ -70,13 +70,13 @@ class ViewPlugin(object):
             tasks = app.printer.get_all_tasks()
             win.set_print_number(len(tasks), not app.printer.is_ready())
 
-        if app.find_print_event(events) or (win.get_image() and not previous_picture):
+        if app.find_right_event(events) or (win.get_image() and not previous_picture):
             win.show_intro(previous_picture, app.printer.is_ready()
                            and app.count.remaining_duplicates > 0)
 
     @pibooth.hookimpl
     def state_wait_validate(self, cfg, app, events):
-        if app.find_capture_event(events):
+        if app.find_left_event(events):
             if len(app.capture_choices) > 1:
                 return 'choose'
             if cfg.getfloat('WINDOW', 'chosen_delay') > 0:
@@ -161,8 +161,8 @@ class ViewPlugin(object):
 
     @pibooth.hookimpl
     def state_print_validate(self, app, win, events):
-        printed = app.find_print_event(events)
-        self.forgotten = app.find_capture_event(events)
+        printed = app.find_right_event(events)
+        self.forgotten = app.find_left_event(events)
         if self.print_view_timer.is_timeout() or printed or self.forgotten:
             if printed:
                 win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())

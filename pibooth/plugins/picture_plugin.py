@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
 
+import itertools
 import os
 import os.path as osp
-import itertools
 from datetime import datetime
+
 import pibooth
-from pibooth.utils import LOGGER, PoolingTimer
 from pibooth.pictures import get_picture_factory
 from pibooth.pictures.pool import PicturesFactoryPool
+from pibooth.utils import LOGGER, PoolingTimer
 
 
 class PicturePlugin(object):
@@ -141,7 +142,7 @@ class PicturePlugin(object):
 
     @pibooth.hookimpl
     def state_print_do(self, cfg, app, events):
-        if app.find_capture_event(events):
+        if app.find_left_event(events):
 
             LOGGER.info("Moving the picture in the forget folder")
             for savedir in cfg.gettuple('GENERAL', 'directory', 'path'):

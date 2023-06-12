@@ -44,7 +44,7 @@ def pibooth_startup(cfg, app):
 
 
 @hookspec(firstresult=True)
-def pibooth_setup_picture_factory(cfg, opt_index, factory):
+def pibooth_setup_picture_factory(cfg, opt_index, factory, orientation):
     """Hook used to setup the ``PictureFactory`` instance.
 
     The ``opt_index`` is the selected index of the ``[PICTURE][captures]``

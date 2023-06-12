@@ -10,6 +10,7 @@ import multiprocessing
 import os
 import os.path as osp
 import shutil
+import subprocess
 import tempfile
 from warnings import filterwarnings
 
@@ -35,7 +36,6 @@ except BadPinFactory:
     from gpiozero.pins.mock import MockFactory
     Device.pin_factory = MockFactory()
     GPIO_INFO = "without physical GPIO, fallback to GPIO mock"
-
 
 BUTTONDOWN = pygame.USEREVENT + 1
 
@@ -97,7 +97,7 @@ class PiApplication(object):
                                     text_color=init_text_color, debug=init_debug)
 
         self._menu = None
-        self._multipress_timer = PoolingTimer(config.getfloat('CONTROLS', 'multi_press_delay'), False)
+        # self._multipress_timer = PoolingTimer(config.getfloat('CONTROLS', 'multi_press_delay'), False)
         self._fingerdown_events = []
 
         # Define states of the application
@@ -116,7 +116,7 @@ class PiApplication(object):
         # Change them may break plugins compatibility
         self.capture_nbr = None
         self.capture_date = None
-        self.capture_choices = (4, 1)
+        self.capture_choices = (1, 2, 4)
         self.previous_picture = None
         self.previous_animated = None
         self.previous_picture_file = None
@@ -125,6 +125,8 @@ class PiApplication(object):
                               taken=0, printed=0, forgotten=0,
                               remaining_duplicates=self._config.getint('PRINTER', 'max_duplicates'))
 
+        self.enable_flash = self._config.getboolean('FLASH', 'enable')
+
         self.camera = self._pm.hook.pibooth_setup_camera(cfg=self._config)
 
         self.buttons = ButtonBoard(right="BOARD" + config.get('CONTROLS', 'right_btn_pin'),
@@ -132,6 +134,7 @@ class PiApplication(object):
                                    center="BOARD" + config.get('CONTROLS', 'center_btn_pin'),
                                    hold_time=config.getfloat('CONTROLS', 'debounce_delay'),
                                    pull_up=True)
+
         self.buttons.right.when_held = self._on_button_right_held
         self.buttons.left.when_held = self._on_button_left_held
         self.buttons.center.when_held = self._on_button_center_held
@@ -143,6 +146,7 @@ class PiApplication(object):
                                config.getint('PRINTER', 'max_pages'),
                                config.gettyped('PRINTER', 'printer_options'),
                                self.count)
+        self.tirage_number = 1
         # ---------------------------------------------------------------------
 
     def _initialize(self):
@@ -196,69 +200,27 @@ class PiApplication(object):
     def _on_button_left_held(self):
         """Called when the left button is pressed.
         """
-        if all(self.buttons.value):
-            pass
-        #     self.buttons.capture.hold_repeat = True
-        #     if self._multipress_timer.elapsed() == 0:
-        #         self._multipress_timer.start()
-        #     if self._multipress_timer.is_timeout():
-        #         # Capture was held while printer was pressed
-        #         if self._menu and self._menu.is_shown():
-        #             # Convert HW button events to keyboard events for menu
-        #             event = self._menu.create_back_event()
-        #             LOGGER.debug("BUTTONDOWN: generate MENU-ESC event")
-        #         else:
-        #             event = pygame.event.Event(BUTTONDOWN, capture=1, printer=1,
-        #                                        button=self.buttons)
-        #             LOGGER.debug("BUTTONDOWN: generate DOUBLE buttons event")
-        #         self.buttons.capture.hold_repeat = False
-        #         self._multipress_timer.reset()
-        #         pygame.event.post(event)
-        else:
-            # Capture was held but printer not pressed
-            if self._menu and self._menu.is_shown():
-                # Convert HW button events to keyboard events for menu
-                event = self._menu.create_next_event()
-                LOGGER.debug("BUTTONDOWN: generate MENU-NEXT event")
-            else:
-                event = pygame.event.Event(BUTTONDOWN, left=1, center=0, right=0,
-                                           button=self.buttons.left)
-                LOGGER.debug("BUTTONDOWN: generate LEFT button event")
-            self.buttons.capture.hold_repeat = False
-            self._multipress_timer.reset()
-            pygame.event.post(event)
+        event = pygame.event.Event(BUTTONDOWN, left=1, center=0, right=0,
+                                   button=self.buttons.left)
+        LOGGER.debug("BUTTONDOWN: generate LEFT event")
+        pygame.event.post(event)
 
     def _on_button_right_held(self):
         """Called when the left button is pressed.
         """
-        if all(self.buttons.value):
-            # Printer was held while capture was pressed
-            # but don't do anything here, let capture_held handle it instead
-            pass
-        else:
-            # Printer was held but capture not pressed
-            if self._menu and self._menu.is_shown():
-                # Convert HW button events to keyboard events for menu
-                event = self._menu.create_click_event()
-                LOGGER.debug("BUTTONDOWN: generate MENU-APPLY event")
-            else:
-                event = pygame.event.Event(BUTTONDOWN, left=0, center=0, right=1,
-                                           button=self.buttons.right)
-                LOGGER.debug("BUTTONDOWN: generate RIGHT event")
-            pygame.event.post(event)
+        event = pygame.event.Event(BUTTONDOWN, left=0, center=0, right=1,
+                                   button=self.buttons.right)
+        LOGGER.debug("BUTTONDOWN: generate RIGHT event")
+        pygame.event.post(event)
 
     def _on_button_center_held(self):
         """Called when the center button is pressed.
         """
-        if all(self.buttons.value):
-            # Printer was held while capture was pressed
-            # but don't do anything here, let capture_held handle it instead
-            pass
-        else:
-            event = pygame.event.Event(BUTTONDOWN, left=0, center=1, right=0,
-                                       button=self.buttons.center)
-            LOGGER.debug("BUTTONDOWN: generate CENTER event")
-            pygame.event.post(event)
+
+        event = pygame.event.Event(BUTTONDOWN, left=0, center=1, right=0,
+                                   button=self.buttons.center)
+        LOGGER.debug("BUTTONDOWN: generate CENTER event")
+        pygame.event.post(event)
 
     @property
     def picture_filename(self):
@@ -275,7 +237,7 @@ class PiApplication(object):
             if event.type == pygame.QUIT:
                 return event
             # Quit on ESC key press
-            elif event.type == pygame.KEYDOWN and event.key == pygame.K_ESCAPE:
+            elif event.type == pygame.KEYDOWN and event.key in [pygame.K_ESCAPE, pygame.K_q]:
                 return event
         return None
 
@@ -306,7 +268,16 @@ class PiApplication(object):
         """
         for event in events:
             if event.type == pygame.KEYDOWN and \
-                    event.key == pygame.K_f and pygame.key.get_mods() & pygame.KMOD_CTRL:
+                    event.key == pygame.K_f:
+                return event
+        return None
+
+    def find_unpause_printer_event(self, events):
+        """Return the first found event if found in the list.
+        """
+        for event in events:
+            if event.type == pygame.KEYDOWN and \
+                    event.key == pygame.K_p:
                 return event
         return None
 
@@ -337,8 +308,7 @@ class PiApplication(object):
         """Return the first found event if found in the list.
         """
         for event in events:
-            if event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT\
-                    and pygame.key.get_mods() & pygame.KMOD_CTRL:
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RIGHT:
                 return event
             if (event.type == pygame.MOUSEBUTTONUP and event.button in (1, 2, 3)) or event.type == pygame.FINGERUP:
                 pos = get_event_pos(self._window.display_size, event)
@@ -419,6 +389,13 @@ class PiApplication(object):
 
                 if self.find_fullscreen_event(events):
                     self._window.toggle_fullscreen()
+
+                if self.find_unpause_printer_event(events):
+                    LOGGER.info("BUTTON P: unpause printer")
+                    try:
+                        subprocess.run("/home/pi/scripts/unpause_printer.py", stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+                    except Exception:
+                        LOGGER.warning("Failed to unpause printer")
 
                 event = self.find_resize_event(events)
                 if event:

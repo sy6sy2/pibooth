@@ -6,7 +6,8 @@ import os.path as osp
 from datetime import datetime
 
 import pibooth
-from pibooth.pictures import get_picture_factory
+from pibooth.pictures import (LANDSCAPE, PORTRAIT, get_best_orientation,
+                              get_picture_factory)
 from pibooth.pictures.pool import PicturesFactoryPool
 from pibooth.utils import LOGGER, PoolingTimer
 
@@ -34,22 +35,25 @@ class PicturePlugin(object):
         app.previous_picture_file = None
 
     @pibooth.hookimpl(hookwrapper=True)
-    def pibooth_setup_picture_factory(self, cfg, opt_index, factory):
+    def pibooth_setup_picture_factory(self, cfg, opt_index, factory, orientation):
 
         outcome = yield  # all corresponding hookimpls are invoked here
         factory = outcome.get_result() or factory
 
         factory.set_margin(cfg.getint('PICTURE', 'margin_thick'))
 
-        backgrounds = cfg.gettuple('PICTURE', 'backgrounds', ('color', 'path'), 2)
+        backgrounds = cfg.gettuple('PICTURE', 'backgrounds', ('color', 'path'), 3)
         factory.set_background(backgrounds[opt_index])
 
-        overlays = cfg.gettuple('PICTURE', 'overlays', 'path', 2)
+        overlays = cfg.gettuple('PICTURE', 'overlays', 'path', 3)
         if overlays[opt_index]:
             factory.set_overlay(overlays[opt_index])
 
-        texts = [cfg.get('PICTURE', 'footer_text1').strip('"').format(**self.texts_vars),
-                 cfg.get('PICTURE', 'footer_text2').strip('"').format(**self.texts_vars)]
+        if orientation == LANDSCAPE:
+            texts = [cfg.get('PICTURE', 'footer_text3').strip('"').format(**self.texts_vars)]
+        else:
+            texts = [cfg.get('PICTURE', 'footer_text1').strip('"').format(**self.texts_vars),
+                     cfg.get('PICTURE', 'footer_text2').strip('"').format(**self.texts_vars)]
         colors = cfg.gettuple('PICTURE', 'text_colors', 'color', len(texts))
         text_fonts = cfg.gettuple('PICTURE', 'text_fonts', str, len(texts))
         alignments = cfg.gettuple('PICTURE', 'text_alignments', str, len(texts))
@@ -116,9 +120,11 @@ class PicturePlugin(object):
 
         LOGGER.info("Creating the final picture")
         default_factory = get_picture_factory(captures, cfg.get('PICTURE', 'orientation'))
+        orientation = get_best_orientation(captures)
         factory = self._pm.hook.pibooth_setup_picture_factory(cfg=cfg,
                                                               opt_index=idx,
-                                                              factory=default_factory)
+                                                              factory=default_factory,
+                                                              orientation=orientation)
         app.previous_picture = factory.build()
 
         for savedir in cfg.gettuple('GENERAL', 'directory', 'path'):
@@ -130,9 +136,11 @@ class PicturePlugin(object):
             for capture in captures:
                 default_factory = get_picture_factory((capture,), cfg.get(
                     'PICTURE', 'orientation'), force_pil=True, dpi=200)
+                orientation = get_best_orientation((capture,))
                 factory = self._pm.hook.pibooth_setup_picture_factory(cfg=cfg,
                                                                       opt_index=idx,
-                                                                      factory=default_factory)
+                                                                      factory=default_factory,
+                                                                      orientation=orientation)
                 factory.set_margin(factory._margin // 3)  # 1/3 since DPI is divided by 3
                 self.factory_pool.add(factory)
 
@@ -140,21 +148,21 @@ class PicturePlugin(object):
     def state_processing_exit(self, app):
         app.count.taken += 1  # Do it here because 'print' state can be skipped
 
-    @pibooth.hookimpl
-    def state_print_do(self, cfg, app, events):
-        if app.find_left_event(events):
+    # @pibooth.hookimpl
+    # def state_print_do(self, cfg, app, events):
+    #     if app.find_left_event(events):
 
-            LOGGER.info("Moving the picture in the forget folder")
-            for savedir in cfg.gettuple('GENERAL', 'directory', 'path'):
-                forgetdir = osp.join(savedir, "forget")
-                if not osp.isdir(forgetdir):
-                    os.makedirs(forgetdir)
-                os.rename(osp.join(savedir, app.picture_filename), osp.join(forgetdir, app.picture_filename))
+    #         LOGGER.info("Moving the picture in the forget folder")
+    #         for savedir in cfg.gettuple('GENERAL', 'directory', 'path'):
+    #             forgetdir = osp.join(savedir, "forget")
+    #             if not osp.isdir(forgetdir):
+    #                 os.makedirs(forgetdir)
+    #             os.rename(osp.join(savedir, app.picture_filename), osp.join(forgetdir, app.picture_filename))
 
-            self._reset_vars(app)
-            app.count.forgotten += 1
-            app.previous_picture = self.second_previous_picture
+    #         self._reset_vars(app)
+    #         app.count.forgotten += 1
+    #         app.previous_picture = self.second_previous_picture
 
-            # Deactivate the print function for the backuped picture
-            # as we don't known how many times it has already been printed
-            app.count.remaining_duplicates = 0
+    #         # Deactivate the print function for the backuped picture
+    #         # as we don't known how many times it has already been printed
+    #         app.count.remaining_duplicates = 0

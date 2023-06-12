@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import time
-import pygame
+
 import pibooth
+import pygame
 from pibooth import camera
 from pibooth.utils import LOGGER
 
@@ -60,8 +61,10 @@ class CameraPlugin(object):
         if event:
             if event.key == pygame.K_LEFT:
                 app.capture_nbr = app.capture_choices[0]
-            elif event.key == pygame.K_RIGHT:
+            elif event.key == pygame.K_DOWN:
                 app.capture_nbr = app.capture_choices[1]
+            elif event.key == pygame.K_RIGHT:
+                app.capture_nbr = app.capture_choices[2]
 
     @pibooth.hookimpl
     def state_preview_enter(self, cfg, app, win):

@@ -1,15 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import time
 import subprocess
+import time
 from io import BytesIO
+
+from pibooth.camera.base import BaseCamera
+from pibooth.language import get_translated_text
 from PIL import Image
+
 try:
     import picamera
 except ImportError:
     picamera = None  # picamera is optional
-from pibooth.language import get_translated_text
-from pibooth.camera.base import BaseCamera
 
 
 def get_rpi_camera_proxy(port=None):
@@ -54,6 +56,7 @@ class RpiCamera(BaseCamera):
         self._cam.resolution = self.resolution
         self._cam.iso = self.preview_iso
         self._cam.rotation = self.preview_rotation
+        self._cam.exposure_mode = 'sports'
 
     def _show_overlay(self, text, alpha):
         """Add an image as an overlay.
@@ -96,7 +99,7 @@ class RpiCamera(BaseCamera):
         rect = self.get_rect()
         if self._cam.hflip:
             if flip:
-                 # Don't flip again, already done at init
+                # Don't flip again, already done at init
                 flip = False
             else:
                 # Flip again because flipped once at init

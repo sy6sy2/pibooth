@@ -1,15 +1,16 @@
 # -*- coding: utf-8 -*-
 
 import inspect
-import pluggy
 
-from pibooth.utils import LOGGER, load_module
+import pluggy
 from pibooth.plugins import hookspecs
 from pibooth.plugins.camera_plugin import CameraPlugin
+from pibooth.plugins.flash_plugin import FlashPlugin
 from pibooth.plugins.lights_plugin import LightsPlugin
 from pibooth.plugins.picture_plugin import PicturePlugin
 from pibooth.plugins.printer_plugin import PrinterPlugin
 from pibooth.plugins.view_plugin import ViewPlugin
+from pibooth.utils import LOGGER, load_module
 
 
 def create_plugin_manager():
@@ -69,6 +70,7 @@ class PiPluginManager(pluggy.PluginManager):
                 plugins.append(plugin)
 
         plugins += [LightsPlugin(self),  # Last called
+                    FlashPlugin(self),
                     ViewPlugin(self),
                     PrinterPlugin(self),
                     PicturePlugin(self),

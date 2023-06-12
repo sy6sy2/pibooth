@@ -70,13 +70,14 @@ class ViewPlugin(object):
             tasks = app.printer.get_all_tasks()
             win.set_print_number(len(tasks), not app.printer.is_ready())
 
-        if app.find_right_event(events) or (win.get_image() and not previous_picture):
+        # if app.find_right_event(events) or (win.get_image() and not previous_picture):
+        if win.get_image() and not previous_picture:
             win.show_intro(previous_picture, app.printer.is_ready()
                            and app.count.remaining_duplicates > 0)
 
     @pibooth.hookimpl
     def state_wait_validate(self, cfg, app, events):
-        if app.find_left_event(events):
+        if app.find_center_event(events) or app.find_left_event(events) or app.find_right_event(events):
             if len(app.capture_choices) > 1:
                 return 'choose'
             if cfg.getfloat('WINDOW', 'chosen_delay') > 0:
@@ -144,10 +145,12 @@ class ViewPlugin(object):
 
     @pibooth.hookimpl
     def state_processing_validate(self, cfg, app):
-        if app.printer.is_ready() and cfg.getfloat('PRINTER', 'printer_delay') > 0\
-                and app.count.remaining_duplicates > 0:
+        # if app.printer.is_ready() and cfg.getfloat('PRINTER', 'printer_delay') > 0\
+        #         and app.count.remaining_duplicates > 0:
+        if app.printer.is_ready():
             return 'print'
-        return 'finish'  # Can not print
+        # return 'finish'  # Can not print
+        return 'wait'  # Can not print
 
     @pibooth.hookimpl
     def state_print_enter(self, cfg, app, win):
@@ -160,28 +163,104 @@ class ViewPlugin(object):
         self.print_view_timer.start()
 
     @pibooth.hookimpl
+    def state_print_do(self, app, win, events):
+        # If needed update printer queue
+        event = app.find_print_status_event(events)
+        if event and app.printer.is_installed():
+            tasks = app.printer.get_all_tasks()
+            win.set_print_number(len(tasks), not app.printer.is_ready())
+
+    @pibooth.hookimpl
     def state_print_validate(self, app, win, events):
+        # TODO: Restore timeout stuff
         printed = app.find_right_event(events)
-        self.forgotten = app.find_left_event(events)
-        if self.print_view_timer.is_timeout() or printed or self.forgotten:
-            if printed:
-                win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+        # self.forgotten = app.find_left_event(events)
+        go_home = app.find_left_event(events)
+
+        if go_home:
+            return 'wait'
+        if printed:
+            win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
             return 'finish'
+
+        if self.print_view_timer.is_timeout():
+            return 'wait'
 
     @pibooth.hookimpl
     def state_finish_enter(self, cfg, app, win):
-        if cfg.getfloat('WINDOW', 'finish_picture_delay') > 0 and not self.forgotten:
-            win.show_finished(app.previous_picture)
+        LOGGER.info("Print choice")
+        app.tirage_number = 1
+
+        if cfg.getfloat('WINDOW', 'finish_picture_delay') > 0:
             timeout = cfg.getfloat('WINDOW', 'finish_picture_delay')
         else:
-            win.show_finished()
             timeout = 1
 
         # Reset timeout in case of settings changed
         self.finish_timer.timeout = timeout
         self.finish_timer.start()
 
+        # win.show_print(app.previous_picture)
+        win.show_tirage_choice(app.tirage_number)
+        if app.printer.is_installed():
+            win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+
     @pibooth.hookimpl
-    def state_finish_validate(self):
+    def state_finish_do(self, app, win, events):
+        # If needed update printer queue
+        event = app.find_print_status_event(events)
+        if event and app.printer.is_installed():
+            win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+
+        # If tirage number chnaged, update window
+        more = app.find_right_event(events)
+        if more and app.tirage_number != 3:
+            # LOGGER.debug("STATE_FINISH_DO MORE: " + str(self.tirage_number))
+            self.finish_timer.start()
+            app.tirage_number += 1
+            win.show_tirage_choice(app.tirage_number)
+
+        less = app.find_left_event(events)
+        if less and app.tirage_number != 1:
+            # LOGGER.debug("STATE_FINISH_DO LESS: " + str(self.tirage_number))
+            self.finish_timer.start()
+            app.tirage_number -= 1
+            win.show_tirage_choice(app.tirage_number)
+
+    @pibooth.hookimpl
+    def state_finish_validate(self, app, win, events):
+        printed = app.find_center_event(events)
+        if printed:
+            win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+            return "wait"
+
         if self.finish_timer.is_timeout():
             return 'wait'
+
+        # Reset timeout in case of settings changed
+        # self.print_view_timer.timeout = cfg.getfloat('PRINTER', 'printer_delay')
+        # self.print_view_timer.start()
+
+        # if printed or go_home:
+        #     if printed:
+        #         win.set_print_number(len(app.printer.get_all_tasks()), not app.printer.is_ready())
+        #     # return 'finish'
+        #     return 'wait'
+
+    # @pibooth.hookimpl
+    # def state_finish_enter(self, cfg, app, win):
+    #     if cfg.getfloat('WINDOW', 'finish_picture_delay') > 0 and not self.forgotten:
+    #         win.show_finished(app.previous_picture)
+    #         timeout = cfg.getfloat('WINDOW', 'finish_picture_delay')
+    #     else:
+    #         win.show_finished()
+    #         timeout = 1
+
+    #     # Reset timeout in case of settings changed
+    #     self.finish_timer.timeout = timeout
+    #     self.finish_timer.start()
+
+    # @pibooth.hookimpl
+    # def state_finish_validate(self):
+    #     if self.finish_timer.is_timeout():
+    #         return 'wait'

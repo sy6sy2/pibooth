@@ -31,37 +31,43 @@ class PrinterPlugin(object):
         """
         app.count.remaining_duplicates = cfg.getint('PRINTER', 'max_duplicates')
 
-    @pibooth.hookimpl
-    def state_wait_do(self, cfg, app, events):
-        if app.find_right_event(events) and app.previous_picture_file and app.printer.is_installed():
+    # @pibooth.hookimpl
+    # def state_wait_do(self, cfg, app, events):
+    #     if app.find_right_event(events) and app.previous_picture_file and app.printer.is_installed():
 
-            if app.count.remaining_duplicates <= 0:
-                LOGGER.warning("Too many duplicates sent to the printer (%s max)",
-                               cfg.getint('PRINTER', 'max_duplicates'))
-                return
+    #         if app.count.remaining_duplicates <= 0:
+    #             LOGGER.warning("Too many duplicates sent to the printer (%s max)",
+    #                            cfg.getint('PRINTER', 'max_duplicates'))
+    #             return
 
-            elif not app.printer.is_ready():
-                LOGGER.warning("Maximum number of printed pages reached (%s/%s max)", app.count.printed,
-                               cfg.getint('PRINTER', 'max_pages'))
-                return
+    #         elif not app.printer.is_ready():
+    #             LOGGER.warning("Maximum number of printed pages reached (%s/%s max)", app.count.printed,
+    #                            cfg.getint('PRINTER', 'max_pages'))
+    #             return
 
-            self.print_picture(cfg, app)
+    #         self.print_picture(cfg, app)
 
     @pibooth.hookimpl
     def state_processing_enter(self, cfg, app):
         app.count.remaining_duplicates = cfg.getint('PRINTER', 'max_duplicates')
 
-    @pibooth.hookimpl
-    def state_processing_do(self, cfg, app):
-        if app.previous_picture_file and app.printer.is_ready():
-            number = cfg.gettyped('PRINTER', 'auto_print')
-            if number == 'max':
-                number = cfg.getint('PRINTER', 'max_duplicates')
-            for i in range(number):
-                if app.count.remaining_duplicates > 0:
-                    self.print_picture(cfg, app)
+    # @pibooth.hookimpl
+    # def state_processing_do(self, cfg, app):
+    #     if app.previous_picture_file and app.printer.is_ready():
+    #         number = cfg.gettyped('PRINTER', 'auto_print')
+    #         if number == 'max':
+    #             number = cfg.getint('PRINTER', 'max_duplicates')
+    #         for i in range(number):
+    #             if app.count.remaining_duplicates > 0:
+    #                 self.print_picture(cfg, app)
+
+    # @pibooth.hookimpl
+    # def state_print_do(self, cfg, app, events):
+    #     if app.find_right_event(events) and app.previous_picture_file:
+    #         self.print_picture(cfg, app)
 
     @pibooth.hookimpl
-    def state_print_do(self, cfg, app, events):
-        if app.find_right_event(events) and app.previous_picture_file:
-            self.print_picture(cfg, app)
+    def state_finish_do(self, cfg, app, events):
+        if app.find_center_event(events) and app.previous_picture_file:
+            for i in range(0, app.tirage_number):
+                self.print_picture(cfg, app)

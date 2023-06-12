@@ -4,16 +4,15 @@
 """
 
 import os
-from os import path as osp
 from datetime import datetime
+from os import path as osp
 
-from PIL import Image
-
-from pibooth.utils import LOGGER, configure_logging
-from pibooth.plugins import create_plugin_manager
 from pibooth.config import PiConfigParser
-from pibooth.pictures import get_picture_factory
 from pibooth.counters import Counters
+from pibooth.pictures import get_best_orientation, get_picture_factory
+from pibooth.plugins import create_plugin_manager
+from pibooth.utils import LOGGER, configure_logging
+from PIL import Image
 
 
 def get_captures(images_folder):
@@ -54,9 +53,11 @@ def regenerate_all_images(plugin_manager, config, basepath):
             continue
 
         default_factory = get_picture_factory(captures, config.get('PICTURE', 'orientation'))
+        orientation = get_best_orientation(captures)
         factory = plugin_manager.hook.pibooth_setup_picture_factory(cfg=config,
                                                                     opt_index=idx,
-                                                                    factory=default_factory)
+                                                                    factory=default_factory,
+                                                                    orientation=orientation)
 
         picture_file = osp.join(basepath, captures_folder + "_pibooth.jpg")
         factory.save(picture_file)

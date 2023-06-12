@@ -3,16 +3,17 @@
 """Pibooth configuration.
 """
 
-import io
 import ast
+import inspect
+import io
+import itertools
 import os
 import os.path as osp
-import itertools
-import inspect
-from configparser import RawConfigParser
 from collections import OrderedDict as odict
-from pibooth.utils import LOGGER, open_text_editor
+from configparser import RawConfigParser
+
 from pibooth import language
+from pibooth.utils import LOGGER, open_text_editor
 
 
 def values_list_repr(values):
@@ -129,7 +130,7 @@ DEFAULT = odict((
                  "Orientation of the final picture: 'auto', 'portrait' or 'landscape'",
                  "Orientation", ['auto', 'portrait', 'landscape'])),
             ("captures",
-                ((4, 1),
+                ((1, 2, 4),
                  "Possible choice(s) of captures numbers (numbers between 1 to 4)",
                  "Number of captures", ['1', '2', '3', '4'] + [str(val) for val in itertools.permutations(range(1, 5), 2)])),
             ("captures_effects",
@@ -152,6 +153,10 @@ DEFAULT = odict((
                 ("Footer 2",
                  "Secondary text displayed",
                  "Sub-title", "")),
+            ("footer_text3",
+                ("Footer 3",
+                 "Long text displayed",
+                 "Long title", "")),
             ("text_colors",
                 ((0, 0, 0),
                  "RGB colors used for footer texts (list of tuples accepted)",
@@ -240,22 +245,34 @@ DEFAULT = odict((
                 (0.5,
                  "How long to press multiple hardware buttons in seconds",
                  None, None)),
-            ("picture_btn_pin",
+            ("right_btn_pin",
                 (11,
-                 "Physical GPIO IN pin to take a picture",
+                 "Physical GPIO IN pin to press right",
+                 None, None)),
+            ("left_btn_pin",
+                (13,
+                 "Physical GPIO IN pin to press left",
+                 None, None)),
+            ("center_btn_pin",
+                (16,
+                 "Physical GPIO IN pin to press center",
                  None, None)),
             ("picture_led_pin",
                 (7,
                  "Physical GPIO OUT pin to light a LED when picture button is pressed",
                  None, None)),
-            ("print_btn_pin",
-                (13,
-                 "Physical GPIO IN pin to print a picture",
-                 None, None)),
             ("print_led_pin",
                 (15,
                  "Physical GPIO OUT pin to light a LED when print button is pressed",
                  None, None)),
+        ))
+     ),
+    ("FLASH",
+        odict((
+            ("enable",
+                (True,
+                 "Enable of not flash",
+                 "Enable of not flash", ['True', 'False'])),
         ))
      ),
 ))

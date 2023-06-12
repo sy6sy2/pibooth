@@ -3,16 +3,17 @@
 """Pibooth view management.
 """
 
+import contextlib
 import os
 import time
-import contextlib
+
 import pygame
-from pygame import gfxdraw
-from PIL import Image
-from pibooth import pictures, fonts
-from pibooth.view import background
-from pibooth.utils import LOGGER
+from pibooth import fonts, pictures
 from pibooth.pictures import sizing
+from pibooth.utils import LOGGER
+from pibooth.view import background
+from PIL import Image
+from pygame import gfxdraw
 
 
 class PiWindow(object):
@@ -30,8 +31,10 @@ class PiWindow(object):
 
     CENTER = 'center'
     RIGHT = 'right'
+    RIGHT_TWO_THIRD = 'right-two-third'
     LEFT = 'left'
     FULLSCREEN = 'fullscreen'
+    FULLSCREEN_TOP_TWO_THIRD = 'fullscreen-top-two-third'
 
     def __init__(self, title,
                  size=(800, 480),
@@ -69,8 +72,11 @@ class PiWindow(object):
 
         self._pos_map = {self.CENTER: self._center_pos,
                          self.RIGHT: self._right_pos,
+                         self.RIGHT_TWO_THIRD: self._right_two_third_pos,
                          self.LEFT: self._left_pos,
-                         self.FULLSCREEN: self._center_pos}
+                         self.FULLSCREEN: self._center_pos,
+                         self.FULLSCREEN_TOP_TWO_THIRD: self._fullscreen_top_two_third_pos
+                         }
 
         # Don't use pygame.mouse.get_cursor() because will be removed in pygame2
         self._cursor = ((16, 16), (0, 0),
@@ -87,8 +93,12 @@ class PiWindow(object):
 
         if pos == self.FULLSCREEN:
             image_size_max = (self.surface.get_size()[0] * 0.9, self.surface.get_size()[1] * 0.9)
+        elif pos == self.RIGHT_TWO_THIRD:
+            image_size_max = (self.surface.get_size()[0] * 0.64, self.surface.get_size()[1] * 0.9)
+        elif pos == self.FULLSCREEN_TOP_TWO_THIRD:
+            image_size_max = (self.surface.get_size()[0] * 0.66, self.surface.get_size()[1] * 0.66)
         else:
-            image_size_max = (self.surface.get_size()[0] * 0.48, self.surface.get_size()[1])
+            image_size_max = (self.surface.get_size()[0] * 0.48, self.surface.get_size()[1] * 0.9)
 
         buff_size, buff_image = self._buffered_images.get(image_name, (None, None))
         if buff_image and image_size_max == buff_size:
@@ -197,6 +207,25 @@ class PiWindow(object):
         pos = (self.surface.get_rect().centerx + self.surface.get_rect().centerx // 2, self.surface.get_rect().centery)
         return image.get_rect(center=pos) if image else pos
 
+    def _right_two_third_pos(self, image):
+        """
+        Return the position of the given image to be put on the right of the screen
+        """
+        pos = (
+            self.surface.get_rect().centerx + self.surface.get_rect().centerx // 3,
+            self.surface.get_rect().centery
+        )
+        return image.get_rect(center=pos) if image else pos
+
+    def _fullscreen_top_two_third_pos(self, image):
+        """
+        """
+        pos = (
+            self.surface.get_rect().centerx,
+            self.surface.get_rect().centery - self.surface.get_rect().centery // 3
+        )
+        return image.get_rect(center=pos) if image else pos
+
     def get_rect(self, absolute=False):
         """Return a Rect object (as defined in pygame) for this window.
 
@@ -243,13 +272,14 @@ class PiWindow(object):
         """Show introduction view.
         """
         self._capture_number = (0, self._capture_number[1])
-        if with_print and pil_image:
-            self._update_background(background.IntroWithPrintBackground(self.arrow_location, self.arrow_offset))
-        else:
-            self._update_background(background.IntroBackground(self.arrow_location, self.arrow_offset))
+        # if with_print and pil_image:
+        #     self._update_background(background.IntroWithPrintBackground(self.arrow_location, self.arrow_offset))
+        # else:
+        #     self._update_background(background.IntroBackground(self.arrow_location, self.arrow_offset))
+        self._update_background(background.IntroBackground(self.arrow_location, self.arrow_offset))
 
         if pil_image:
-            self._update_foreground(pil_image, self.RIGHT)
+            self._update_foreground(pil_image, self.FULLSCREEN_TOP_TWO_THIRD)
         elif self._current_foreground:
             self._buffered_images.pop(id(self._current_foreground[0]), None)
             self._current_foreground = None
@@ -290,7 +320,7 @@ class PiWindow(object):
         self._update_background(background.PrintBackground(self.arrow_location,
                                                            self.arrow_offset))
         if pil_image:
-            self._update_foreground(pil_image, self.LEFT)
+            self._update_foreground(pil_image, self.FULLSCREEN_TOP_TWO_THIRD)
 
     def show_finished(self, pil_image=None):
         """Show finished view (image resized fullscreen).
@@ -304,6 +334,10 @@ class PiWindow(object):
             self._update_foreground(pil_image, self.FULLSCREEN)
         else:
             self._update_background(background.FinishedBackground())
+
+    def show_tirage_choice(self, tirage_number=1):
+        # LOGGER.debug("SHOW_TIRAGE_CHOICE: " + str(tirage_number))
+        self._update_background(background.TirageChoiceBackground(tirage_number))
 
     @contextlib.contextmanager
     def flash(self, count):
